@@ -3,7 +3,7 @@ data "aws_availability_zones" "available" {}
 
 data "aws_ami" "amazon_linux" {
   most_recent = true
-  owners      = ["137112412989"] # Amazon
+  owners      = ["271443695716"]
 
   filter {
     name   = "name"
@@ -17,103 +17,31 @@ locals {
   az2  = data.aws_availability_zones.available.names[1]
 }
 
-# 
-# VPC & PEERING (REQ-NCA-P1-02)
-
-resource "aws_vpc" "hub" {
-  cidr_block           = "10.1.0.0/16"
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-  tags = { Name = "the-hub-vpc" }
-}
+# ─────────────────────────────────────────
+# VPC
+# One VPC for the entire project.
+# CIDR 10.0.0.0/16 gives us 65 536 IP addresses to work with.
+# ─────────────────────────────────────────
 
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags = { Name = "A-spoke-vpc" }
+  tags = { Name = "main-vpc" }
 }
-
-resource "aws_vpc_peering_connection" "hub_to_spoke" {
-  peer_vpc_id = aws_vpc.main.id
-  vpc_id      = aws_vpc.hub.id
-  auto_accept = true
-  tags = { Name = "A-hub-spoke-peering" }
-}
-
-# 
-# HUB NETWORK & BASTION
-
-resource "aws_subnet" "hub_public" {
-  vpc_id                  = aws_vpc.hub.id
-  cidr_block              = "10.1.1.0/24"
-  availability_zone       = local.az1
-  map_public_ip_on_launch = true
-  tags = { Name = "deniz-hub-public" }
-}
-
-resource "aws_internet_gateway" "hub_igw" {
-  vpc_id = aws_vpc.hub.id
-  tags   = { Name = "gtw-hub-igw" }
-}
-
-resource "aws_route_table" "hub_rt" {
-  vpc_id = aws_vpc.hub.id
-  
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.hub_igw.id
-  }
-  
-  # Spoke VPC'ye giden peering rotası
-  route {
-    cidr_block                = aws_vpc.main.cidr_block
-    vpc_peering_connection_id = aws_vpc_peering_connection.hub_to_spoke.id
-  }
-  tags = { Name = "peering-hub-rt" }
-}
-
-resource "aws_route_table_association" "hub_assoc" {
-  subnet_id      = aws_subnet.hub_public.id
-  route_table_id = aws_route_table.hub_rt.id
-}
-
-resource "aws_security_group" "bastion_sg" {
-  name        = "d-bastion-sg"
-  description = "Allow SSH to Bastion"
-  vpc_id      = aws_vpc.hub.id
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Öğrenci işi olduğu için açık, normalde kendi IP'ni yazmalısın.
-  }
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  tags = { Name = "d-bastion-sg" }
-}
-
-resource "aws_instance" "bastion" {
-  ami           = data.aws_ami.amazon_linux.id
-  instance_type = "t3.micro"
-  subnet_id     = aws_subnet.hub_public.id
-  key_name      = "deniz-key"
-  vpc_security_group_ids = [aws_security_group.bastion_sg.id]
-  tags = { Name = "the-bastion" }
-}
-
-# 
-# SPOKE NETWORK (MAIN VPC)
 
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
-  tags = { Name = "spoke-gw" }
+  tags   = { Name = "main-igw" }
 }
+
+# ─────────────────────────────────────────
+# SUBNETS  (3-tier layout, spread over 2 AZs)
+#
+#   Public  10.0.1.0/24  10.0.2.0/24   <- ALB, Bastion, Monitoring
+#   App     10.0.11.0/24 10.0.12.0/24  <- Web servers (private)
+#   DB      10.0.21.0/24 10.0.22.0/24  <- RDS (private)
+# ─────────────────────────────────────────
 
 resource "aws_subnet" "public_a" {
   vpc_id                  = aws_vpc.main.id
@@ -135,7 +63,7 @@ resource "aws_subnet" "app_private_a" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.11.0/24"
   availability_zone = local.az1
-  tags = { Name = "-app-private-a" }
+  tags = { Name = "app-private-a" }
 }
 
 resource "aws_subnet" "app_private_b" {
@@ -159,159 +87,228 @@ resource "aws_subnet" "db_private_b" {
   tags = { Name = "db-private-b" }
 }
 
+# ─────────────────────────────────────────
+# NAT GATEWAY
+# Private subnets cannot reach the internet directly.
+# The NAT gateway sits in the public subnet and forwards
+# outbound traffic on behalf of private instances.
+# ─────────────────────────────────────────
+
 resource "aws_eip" "nat_eip" {
   domain = "vpc"
-  tags = { Name = "nat-eip" }
+  tags   = { Name = "nat-eip" }
 }
 
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat_eip.id
   subnet_id     = aws_subnet.public_a.id
   depends_on    = [aws_internet_gateway.igw]
-  tags = { Name = "the-nat" }
+  tags          = { Name = "main-nat" }
 }
 
+# ─────────────────────────────────────────
+# ROUTE TABLES
+# Public  -> internet gateway  (0.0.0.0/0 via IGW)
+# Private -> NAT gateway       (0.0.0.0/0 via NAT)
+# ─────────────────────────────────────────
 
-# SPOKE ROUTING
-# 
 resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.main.id
+
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.igw.id
   }
-  route {
-    cidr_block                = aws_vpc.hub.cidr_block
-    vpc_peering_connection_id = aws_vpc_peering_connection.hub_to_spoke.id
-  }
+
   tags = { Name = "public-rt" }
 }
 
-resource "aws_route_table_association" "public_a_assoc" {
+resource "aws_route_table_association" "public_a" {
   subnet_id      = aws_subnet.public_a.id
   route_table_id = aws_route_table.public_rt.id
 }
-resource "aws_route_table_association" "public_b_assoc" {
+
+resource "aws_route_table_association" "public_b" {
   subnet_id      = aws_subnet.public_b.id
   route_table_id = aws_route_table.public_rt.id
 }
 
 resource "aws_route_table" "private_rt" {
   vpc_id = aws_vpc.main.id
+
   route {
     cidr_block     = "0.0.0.0/0"
     nat_gateway_id = aws_nat_gateway.nat.id
   }
-  route {
-    cidr_block                = aws_vpc.hub.cidr_block
-    vpc_peering_connection_id = aws_vpc_peering_connection.hub_to_spoke.id
-  }
+
   tags = { Name = "private-rt" }
 }
 
-resource "aws_route_table_association" "app_private_a_assoc" {
+resource "aws_route_table_association" "app_private_a" {
   subnet_id      = aws_subnet.app_private_a.id
   route_table_id = aws_route_table.private_rt.id
 }
-resource "aws_route_table_association" "app_private_b_assoc" {
+
+resource "aws_route_table_association" "app_private_b" {
   subnet_id      = aws_subnet.app_private_b.id
   route_table_id = aws_route_table.private_rt.id
 }
-resource "aws_route_table_association" "db_private_a_assoc" {
+
+resource "aws_route_table_association" "db_private_a" {
   subnet_id      = aws_subnet.db_private_a.id
   route_table_id = aws_route_table.private_rt.id
 }
-resource "aws_route_table_association" "db_private_b_assoc" {
+
+resource "aws_route_table_association" "db_private_b" {
   subnet_id      = aws_subnet.db_private_b.id
   route_table_id = aws_route_table.private_rt.id
 }
 
-# 
-# SECURITY GROUPS
+# ─────────────────────────────────────────
+# BASTION HOST
+# A small EC2 in the public subnet used to SSH into
+# private instances (app servers, etc.) for debugging.
+# ─────────────────────────────────────────
 
-resource "aws_security_group" "alb_sg" {
-  name        = "the-alb-sg"
-  description = "Allow HTTP from internet"
+resource "aws_security_group" "bastion_sg" {
+  name        = "bastion-sg"
+  description = "Allow SSH from anywhere to the bastion"
   vpc_id      = aws_vpc.main.id
 
   ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "bastion-sg" }
+}
+
+resource "aws_instance" "bastion" {
+  ami           = data.aws_ami.amazon_linux.id
+  instance_type = "t3.micro"
+  subnet_id     = aws_subnet.public_a.id
+  key_name      = "deniz-key"
+
+  vpc_security_group_ids = [aws_security_group.bastion_sg.id]
+
+  tags = { Name = "bastion" }
+}
+
+# ─────────────────────────────────────────
+# SECURITY GROUPS
+#
+# Traffic flow:
+#   Internet -> ALB (port 80)
+#   ALB      -> App servers (port 80)
+#   Bastion  -> App servers (port 22, SSH)
+#   App      -> RDS (port 3306, MySQL)
+#   Bastion  -> RDS (port 3306, for manual queries)
+# ─────────────────────────────────────────
+
+resource "aws_security_group" "alb_sg" {
+  name        = "alb-sg"
+  description = "Allow HTTP traffic from the internet"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "HTTP from internet"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  tags = { Name = "the-alb-sg" }
+
+  tags = { Name = "alb-sg" }
 }
 
 resource "aws_security_group" "app_sg" {
-  name        = "the-app-sg"
+  name        = "app-sg"
   description = "Allow HTTP from ALB and SSH from Bastion"
   vpc_id      = aws_vpc.main.id
 
   ingress {
+    description     = "HTTP from ALB"
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
     security_groups = [aws_security_group.alb_sg.id]
   }
+
   ingress {
+    description     = "SSH from Bastion"
     from_port       = 22
     to_port         = 22
     protocol        = "tcp"
-    security_groups = [aws_security_group.bastion_sg.id] # Bastion'dan erişim
+    security_groups = [aws_security_group.bastion_sg.id]
   }
+
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  tags = { Name = "the-app-sg" }
+
+  tags = { Name = "app-sg" }
 }
 
 resource "aws_security_group" "db_sg" {
-  name        = "a-db-sg"
-  description = "Allow MySQL from app and Bastion"
+  name        = "db-sg"
+  description = "Allow MySQL from app servers and Bastion"
   vpc_id      = aws_vpc.main.id
 
   ingress {
+    description     = "MySQL from app and bastion"
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
     security_groups = [aws_security_group.app_sg.id, aws_security_group.bastion_sg.id]
   }
+
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  tags = { Name = "a-db-sg" }
+
+  tags = { Name = "db-sg" }
 }
 
-# 
+# ─────────────────────────────────────────
 # LOAD BALANCER
+# The ALB distributes incoming HTTP traffic across
+# all healthy app server instances.
+# ─────────────────────────────────────────
 
 resource "aws_lb" "app_alb" {
-  name               = "applb"
+  name               = "app-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets = [
-    aws_subnet.public_a.id,
-    aws_subnet.public_b.id
-  ]
-  tags = { Name = "applb" }
+  subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id]
+  tags               = { Name = "app-alb" }
 }
 
 resource "aws_lb_target_group" "app_tg" {
-  name     = "a-tg"
+  name     = "app-tg"
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
@@ -325,7 +322,8 @@ resource "aws_lb_target_group" "app_tg" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
   }
-  tags = { Name = "a-tg" }
+
+  tags = { Name = "app-tg" }
 }
 
 resource "aws_lb_listener" "http" {
@@ -339,109 +337,109 @@ resource "aws_lb_listener" "http" {
   }
 }
 
+# ─────────────────────────────────────────
+# AUTO SCALING GROUP
+# Automatically adds or removes EC2 instances based on load.
+# Min 2 instances (high availability), max 4 (cost control).
+# Each new instance runs the user_data script on startup.
+# ─────────────────────────────────────────
 
-# AUTOSCALING (REQ-NCA-P1-09)
-#
 resource "aws_launch_template" "app_lt" {
-  name_prefix   = "launchtemp-"
+  name_prefix   = "app-lt-"
   image_id      = data.aws_ami.amazon_linux.id
   instance_type = var.instance_type
 
   vpc_security_group_ids = [aws_security_group.app_sg.id]
 
-
+  # This script runs automatically when a new instance starts
   user_data = base64encode(<<-EOF
     #!/bin/bash
     dnf update -y
     dnf install -y nginx
+
     systemctl enable nginx
     systemctl start nginx
 
-    # mevcut web sayfasi ayari
-    echo "<h1> web server connected to db.deniztech.internal</h1><p>Hostname: $(hostname)</p>" > /usr/share/nginx/html/index.html
-    
-    #  monitoring aracini ayağa kaldiriyorum
-    sudo usermod -aG docker ec2-user
+    # Simple web page showing the hostname of this instance
+    echo "<h1>Hello from $(hostname)</h1>" > /usr/share/nginx/html/index.html
+
+    # node-exporter lets Prometheus collect metrics from this instance
+    dnf install -y docker
+    systemctl enable docker
+    systemctl start docker
     docker run -d --name=node-exporter -p 9100:9100 prom/node-exporter
   EOF
   )
 
   tag_specifications {
     resource_type = "instance"
-    tags = { Name = "tags-app" }
+    tags          = { Name = "app-instance" }
   }
 }
 
 resource "aws_autoscaling_group" "app_asg" {
-  name                = "localname-asg"
+  name                = "app-asg"
   min_size            = 2
   max_size            = 4
   desired_capacity    = 2
-  vpc_zone_identifier = [
-    aws_subnet.app_private_a.id,
-    aws_subnet.app_private_b.id
-  ]
-  target_group_arns = [aws_lb_target_group.app_tg.arn]
-  health_check_type = "ELB"
-
+  vpc_zone_identifier = [aws_subnet.app_private_a.id, aws_subnet.app_private_b.id]
+  target_group_arns   = [aws_lb_target_group.app_tg.arn]
+  health_check_type   = "ELB"
 
   launch_template {
     id      = aws_launch_template.app_lt.id
     version = "$Latest"
-    
   }
 
   tag {
     key                 = "Name"
-    value               = "localname-app-instance"
+    value               = "app-instance"
     propagate_at_launch = true
   }
 }
 
-
-
-
-# DATABASE (REQ-NCA-P1-03)
+# ─────────────────────────────────────────
+# DATABASE  (RDS MySQL)
+# Managed MySQL database in the private DB subnets.
+# Not publicly accessible — only reachable from within the VPC.
+# ─────────────────────────────────────────
 
 resource "aws_db_subnet_group" "db_subnet_group" {
-  name = "db-subnet-group"
-  subnet_ids = [
-    aws_subnet.db_private_a.id,
-    aws_subnet.db_private_b.id
-  ]
-  tags = { Name = "db-subnet-group" }
+  name       = "db-subnet-group"
+  subnet_ids = [aws_subnet.db_private_a.id, aws_subnet.db_private_b.id]
+  tags       = { Name = "db-subnet-group" }
 }
 
 resource "aws_db_instance" "mysql" {
-  identifier             = "cs1-mysql-v2"
+  identifier             = "main-mysql"
   allocated_storage      = 20
   engine                 = "mysql"
   engine_version         = "8.0"
   instance_class         = "db.t3.micro"
-  db_name                = "casedb"
-  username               = "admin"
-  password               = "denizpassword"
+  db_name                = var.db_name
+  username               = var.db_username
+  password               = var.db_password
   publicly_accessible    = false
-  skip_final_snapshot    = true # Öğrenci hesabı için silerken uğraştırmasın
+  skip_final_snapshot    = true
   multi_az               = false
   db_subnet_group_name   = aws_db_subnet_group.db_subnet_group.name
   vpc_security_group_ids = [aws_security_group.db_sg.id]
-
-  tags = { Name = "cs1-mysql" }
+  tags                   = { Name = "main-mysql" }
 }
 
-#
-# PRIVATE DNS (REQ-NCA-P1-04)
+# ─────────────────────────────────────────
+# PRIVATE DNS  (Route 53)
+# Internal domain names so services can find each other
+# without hardcoding IP addresses.
+#   db.deniztech.internal         -> RDS endpoint
+#   monitoring.deniztech.internal -> Monitoring server IP
+# ─────────────────────────────────────────
 
 resource "aws_route53_zone" "private" {
-  name = "deniztech.internal" 
-  
-  # DNS'i her iki VPC'ye de bağladık ki Bastion'dan da isimle erişebil.
+  name = "deniztech.internal"
+
   vpc {
     vpc_id = aws_vpc.main.id
-  }
-  vpc {
-    vpc_id = aws_vpc.hub.id
   }
 }
 
@@ -453,12 +451,126 @@ resource "aws_route53_record" "db" {
   records = [aws_db_instance.mysql.address]
 }
 
-# OUTPUTS
-# 
-output "alb_dns_name" {
-  value = aws_lb.app_alb.dns_name
-}
-output "bastion_public_ip" {
-  value = aws_instance.bastion.public_ip
+# ─────────────────────────────────────────
+# MONITORING  (Prometheus + Grafana)
+# A single EC2 running both tools inside Docker containers.
+#   Prometheus (port 9090) – collects metrics
+#   Grafana    (port 3000) – displays dashboards
+# ─────────────────────────────────────────
+
+resource "aws_security_group" "monitoring_sg" {
+  name        = "monitoring-sg"
+  description = "Allow Prometheus (9090) and Grafana (3000) from anywhere"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "Prometheus"
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Grafana"
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description     = "SSH from Bastion"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bastion_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "monitoring-sg" }
 }
 
+resource "aws_instance" "monitoring" {
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = "t3.small"
+  subnet_id              = aws_subnet.public_a.id
+  key_name               = "deniz-key"
+  vpc_security_group_ids = [aws_security_group.monitoring_sg.id]
+
+  user_data = base64encode(<<-EOF
+    #!/bin/bash
+    dnf update -y
+    dnf install -y docker
+    systemctl enable docker
+    systemctl start docker
+
+    # Prometheus config file
+    mkdir -p /etc/prometheus
+    cat > /etc/prometheus/prometheus.yml << 'PROM'
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "app-nodes"
+    static_configs:
+      - targets: []   # add app instance IPs here (port 9100)
+PROM
+
+    # Start Prometheus
+    docker run -d \
+      --name prometheus \
+      --restart always \
+      -p 9090:9090 \
+      -v /etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml \
+      prom/prometheus
+
+    # Start Grafana (default login: admin / admin)
+    docker run -d \
+      --name grafana \
+      --restart always \
+      -p 3000:3000 \
+      grafana/grafana
+  EOF
+  )
+
+  tags = { Name = "monitoring-server" }
+}
+
+resource "aws_route53_record" "monitoring" {
+  zone_id = aws_route53_zone.private.zone_id
+  name    = "monitoring.deniztech.internal"
+  type    = "A"
+  ttl     = 300
+  records = [aws_instance.monitoring.private_ip]
+}
+
+# ─────────────────────────────────────────
+# OUTPUTS
+# These values are printed after terraform apply.
+# ─────────────────────────────────────────
+
+output "alb_dns_name" {
+  description = "Open this URL in your browser to reach the app"
+  value       = aws_lb.app_alb.dns_name
+}
+
+output "bastion_public_ip" {
+  description = "SSH into this IP to access private resources"
+  value       = aws_instance.bastion.public_ip
+}
+
+output "monitoring_public_ip" {
+  description = "Grafana: http://<ip>:3000  |  Prometheus: http://<ip>:9090"
+  value       = aws_instance.monitoring.public_ip
+}
