@@ -1,3 +1,8 @@
+variable "aws_region" {
+  type    = string
+  default = "eu-central-1"
+}
+
 variable "ses_sender_email" {
   type        = string
   description = "Verified SES email address to send alerts from"

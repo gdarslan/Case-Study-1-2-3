@@ -5,7 +5,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install the AWS SDK for Python
-RUN pip install boto3
+RUN pip install boto3 flask
 
 # Copy the application files into the container
 COPY app.py rule_engine.py ses_handler.py s3_handler.py ./

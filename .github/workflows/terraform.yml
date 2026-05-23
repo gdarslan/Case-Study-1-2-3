@@ -6,21 +6,57 @@ on:
       - main
     paths:
       - '**.tf'
+      - 'soar/ses_handler.py'
+      - 'soar/s3_handler.py'
 
 jobs:
-  terraform:
+  terraform-soar:
+    name: Terraform SOAR stack
     runs-on: self-hosted
 
     env:
       AWS_ACCESS_KEY_ID:          ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY:      ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION:                 ${{ secrets.AWS_REGION }}
+      TF_VAR_aws_region:          ${{ secrets.AWS_REGION }}
       TF_VAR_ses_sender_email:    ${{ secrets.TF_VAR_ses_sender_email }}
       TF_VAR_ses_recipient_email: ${{ secrets.TF_VAR_ses_recipient_email }}
-      TF_VAR_db_password:         ${{ secrets.TF_VAR_db_password }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+  terraform-infra:
+    name: Terraform infrastructure stack
+    runs-on: self-hosted
+
+    env:
+      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION:            ${{ secrets.AWS_REGION }}
+      TF_VAR_aws_region:     ${{ secrets.AWS_REGION }}
+      TF_VAR_db_password:    ${{ secrets.TF_VAR_db_password }}
 
     defaults:
       run:
-        working-directory: ./Infra   # all terraform commands run from the Infra folder
+        working-directory: ./Infra
 
     steps:
       - name: Checkout
