@@ -1,0 +1,4 @@
+aws_region   = "eu-central-1"
+ssh_key_name = "your-existing-key-pair"
+# Set TF_VAR_db_password in your environment; never commit it.
+admin_cidr = "192.0.2.1/32" # replace with your trusted admin range

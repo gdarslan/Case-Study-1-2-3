@@ -47,6 +47,9 @@ metadata:
 spec:
   ttlSecondsAfterFinished: 300
   template:
+    metadata:
+      labels:
+        app: db-init
     spec:
       restartPolicy: OnFailure
       containers:
@@ -55,7 +58,7 @@ spec:
           command: ["sh", "-c"]
           args:
             - |
-              psql "postgresql://$DB_USER:$DB_PASS@$DB_HOST:$DB_PORT/$DB_NAME" \
+              PGPASSWORD="$DB_PASS" psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
                    -f /sql/init.sql && echo "DB init complete."
           envFrom:
             - secretRef:

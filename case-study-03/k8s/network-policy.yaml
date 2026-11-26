@@ -1,17 +1,31 @@
-# Micro-segmentation: limits lateral movement inside the cluster (REQ-NCA-P3-07)
-
-# Frontend can only receive traffic from the ALB ingress
+# The local PostgreSQL deployment is explicitly reachable only from the API and init Job.
+# NetworkPolicy requires a policy-capable CNI (the local script selects Calico).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-ingress-to-frontend
+  name: default-deny-all
+  namespace: hr-app
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-policy
   namespace: hr-app
 spec:
   podSelector:
     matchLabels:
       app: hr-frontend
+  policyTypes: [Ingress, Egress]
   ingress:
-    - {}   # ALB targets pods directly (IP mode) — allow all ingress at pod level
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 80
   egress:
     - to:
         - podSelector:
@@ -25,16 +39,16 @@ spec:
         - port: 53
           protocol: TCP
 ---
-# Backend can only receive traffic from the frontend
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-frontend-to-backend
+  name: backend-policy
   namespace: hr-app
 spec:
   podSelector:
     matchLabels:
       app: hr-backend
+  policyTypes: [Ingress, Egress]
   ingress:
     - from:
         - podSelector:
@@ -43,16 +57,58 @@ spec:
       ports:
         - port: 8000
   egress:
-    - {}   # backend needs outbound for RDS (outside cluster) and DNS
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - port: 5432
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
 ---
-# Default deny all traffic not explicitly allowed in this namespace
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-deny-all
+  name: postgres-ingress
   namespace: hr-app
 spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-    - Egress
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: hr-backend
+        - podSelector:
+            matchLabels:
+              app: db-init
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-init-egress
+  namespace: hr-app
+spec:
+  podSelector:
+    matchLabels:
+      app: db-init
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - port: 5432
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP

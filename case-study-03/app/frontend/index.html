@@ -112,6 +112,7 @@
     .btn-cancel { background: #e0e0e0; color: #333; }
 
     #error-msg { color: #e94560; font-size: 0.85rem; margin-top: 0.5rem; }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
@@ -122,9 +123,19 @@
 </header>
 
 <main>
+  <form id="login-form" style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+    <label for="access-token">Demo access token</label>
+    <input id="access-token" type="password" autocomplete="off" required />
+    <button class="btn-primary" type="submit">Sign in</button>
+    <span id="login-error" role="status"></span>
+  </form>
+  <div id="session-info" hidden style="margin-bottom:1rem">
+    <span id="session-role"></span>
+    <button type="button" class="btn-cancel" id="sign-out">Sign out</button>
+  </div>
   <div class="toolbar">
     <h2>Employees</h2>
-    <button class="btn-primary" onclick="openModal()">+ Add Employee</button>
+    <button id="add-employee" class="btn-primary" onclick="openModal()" disabled>+ Add Employee</button>
   </div>
 
   <table id="emp-table">
@@ -140,7 +151,7 @@
       </tr>
     </thead>
     <tbody id="emp-body">
-      <tr><td colspan="7" style="text-align:center;padding:2rem;color:#999">Loading...</td></tr>
+      <tr><td colspan="7" style="text-align:center;padding:2rem;color:#999">Sign in to view employees.</td></tr>
     </tbody>
   </table>
 </main>
@@ -187,121 +198,176 @@
 </div>
 
 <script>
-  // When running locally, hit the backend directly.
-  // When deployed, use empty string so "/api/employees" goes through nginx proxy.
-  const API = window.location.hostname === "localhost"
-    ? "http://localhost:8000"
-    : "";
-
+  // Same-origin Nginx proxy; never expose the token in URLs or persistent browser storage.
+  let token = "";
+  let role = "";
   let editingId = null;
+  const $ = id => document.getElementById(id);
+  const body = $("emp-body");
 
-  async function fetchEmployees() {
-    const res  = await fetch(`${API}/api/employees`);
-    const data = await res.json();
-    const tbody = document.getElementById("emp-body");
-
-    if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#999">No employees found.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.map(e => `
-      <tr>
-        <td>${e.id}</td>
-        <td>${e.name}</td>
-        <td>${e.email}</td>
-        <td>${e.department}</td>
-        <td>${e.role}</td>
-        <td><span class="badge badge-${e.status}">${e.status}</span></td>
-        <td>
-          <button class="btn-edit" onclick="openModal(${e.id})">Edit</button>
-          ${e.status === 'active'
-            ? `<button class="btn-deactivate" onclick="deactivate(${e.id})" style="margin-left:6px">Deactivate</button>`
-            : ''}
-        </td>
-      </tr>
-    `).join("");
+  function showMessage(message) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 7;
+    td.textContent = message;
+    td.style.textAlign = "center";
+    tr.appendChild(td);
+    body.replaceChildren(tr);
   }
 
-  function openModal(id = null) {
-    editingId = id;
-    document.getElementById("error-msg").textContent = "";
+  async function apiFetch(path, options = {}) {
+    return fetch(path, {
+      ...options,
+      credentials: "same-origin",
+      headers: { ...(options.headers || {}), Authorization: "Bearer " + token }
+    });
+  }
 
-    if (id) {
-      document.getElementById("modal-title").textContent = "Edit Employee";
-      document.getElementById("status-group").style.display = "block";
-      fetch(`${API}/api/employees/${id}`)
-        .then(r => r.json())
-        .then(e => {
-          document.getElementById("f-name").value       = e.name;
-          document.getElementById("f-email").value      = e.email;
-          document.getElementById("f-department").value = e.department;
-          document.getElementById("f-role").value       = e.role;
-          document.getElementById("f-status").value     = e.status;
-        });
-    } else {
-      document.getElementById("modal-title").textContent = "Add Employee";
-      document.getElementById("status-group").style.display = "none";
-      ["f-name","f-email","f-department"].forEach(id => document.getElementById(id).value = "");
-      document.getElementById("f-role").value = "developer";
+  function signOut(message = "") {
+    token = "";
+    role = "";
+    $("access-token").value = "";
+    $("login-form").hidden = false;
+    $("session-info").hidden = true;
+    $("add-employee").disabled = true;
+    $("login-error").textContent = message;
+    closeModal();
+    showMessage("Sign in to view employees.");
+  }
+
+  $("login-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    token = $("access-token").value;
+    $("access-token").value = "";
+    try {
+      const res = await apiFetch("/api/session");
+      if (!res.ok) throw new Error("Invalid access token.");
+      role = (await res.json()).role;
+      $("login-form").hidden = true;
+      $("session-info").hidden = false;
+      $("session-role").textContent = "Signed in as " + role;
+      $("add-employee").disabled = role !== "admin";
+      await fetchEmployees();
+    } catch (err) {
+      signOut(err.message || "Unable to sign in.");
     }
+  });
+  $("sign-out").addEventListener("click", () => signOut());
 
-    document.getElementById("modal").classList.add("open");
+  function actionButton(label, className, action) {
+    const button = document.createElement("button");
+    button.textContent = label;
+    button.className = className;
+    button.addEventListener("click", action);
+    return button;
+  }
+
+  async function fetchEmployees() {
+    if (!token) return;
+    const activeToken = token;
+    try {
+      const res = await apiFetch("/api/employees");
+      if (activeToken !== token) return;
+      if (res.status === 401) return signOut("Please sign in again.");
+      if (!res.ok) throw new Error("Unable to fetch employee records.");
+      const rows = await res.json();
+      if (activeToken !== token) return;
+      if (!rows.length) return showMessage("No employees found.");
+      body.replaceChildren();
+      for (const e of rows) {
+        const tr = document.createElement("tr");
+        // Employee data is text, never executable markup.
+        for (const value of [e.id, e.name, e.email, e.department, e.role]) {
+          const td = document.createElement("td");
+          td.textContent = value ?? "";
+          tr.appendChild(td);
+        }
+        const status = document.createElement("td");
+        const badge = document.createElement("span");
+        const safeStatus = ["active", "inactive", "pending"].includes(e.status) ? e.status : "unknown";
+        badge.className = "badge badge-" + safeStatus;
+        badge.textContent = safeStatus;
+        status.appendChild(badge);
+        tr.appendChild(status);
+        const controls = document.createElement("td");
+        if (role === "admin") {
+          controls.appendChild(actionButton("Edit", "btn-edit", () => openModal(e.id)));
+          if (e.status === "active") controls.appendChild(actionButton("Deactivate", "btn-deactivate", () => deactivate(e.id)));
+        } else {
+          controls.textContent = "Read-only";
+        }
+        tr.appendChild(controls);
+        body.appendChild(tr);
+      }
+    } catch (err) {
+      if (activeToken === token) showMessage(err.message);
+    }
+  }
+
+  async function openModal(id = null) {
+    if (role !== "admin") return;
+    editingId = id;
+    $("error-msg").textContent = "";
+    $("f-email").disabled = id !== null;
+    $("status-group").style.display = id ? "block" : "none";
+    $("modal-title").textContent = id ? "Edit Employee" : "Add Employee";
+    if (id) {
+      const res = await apiFetch("/api/employees/" + encodeURIComponent(id));
+      if (!res.ok || role !== "admin") return;
+      const e = await res.json();
+      if (role !== "admin") return;
+      for (const field of ["name", "email", "department", "role", "status"]) $("f-" + field).value = e[field];
+    } else {
+      for (const field of ["name", "email", "department"]) $("f-" + field).value = "";
+      $("f-role").value = "developer";
+    }
+    $("modal").classList.add("open");
   }
 
   function closeModal() {
-    document.getElementById("modal").classList.remove("open");
+    $("modal").classList.remove("open");
     editingId = null;
   }
 
   async function saveEmployee() {
-    const body = {
-      name:       document.getElementById("f-name").value.trim(),
-      email:      document.getElementById("f-email").value.trim(),
-      department: document.getElementById("f-department").value.trim(),
-      role:       document.getElementById("f-role").value,
-    };
-
-    if (editingId) {
-      body.status = document.getElementById("f-status").value;
-    }
-
-    if (!body.name || !body.email || !body.department) {
-      document.getElementById("error-msg").textContent = "All fields are required.";
+    if (role !== "admin") return;
+    const data = {name: $("f-name").value.trim(), department: $("f-department").value.trim(), role: $("f-role").value};
+    if (editingId) data.status = $("f-status").value;
+    else data.email = $("f-email").value.trim();
+    if (!data.name || !data.department || (!editingId && !data.email)) {
+      $("error-msg").textContent = "All required fields must be filled.";
       return;
     }
-
-    const url    = editingId ? `${API}/api/employees/${editingId}` : `${API}/api/employees`;
-    const method = editingId ? "PUT" : "POST";
-
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      document.getElementById("error-msg").textContent = err.detail || "Something went wrong.";
-      return;
+    const route = editingId ? "/api/employees/" + encodeURIComponent(editingId) : "/api/employees";
+    try {
+      const res = await apiFetch(route, {
+        method: editingId ? "PUT" : "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+      });
+      if (res.status === 401) return signOut("Please sign in again.");
+      if (!res.ok) {
+        const err = await res.json();
+        $("error-msg").textContent = typeof err.detail === "string" ? err.detail : "Check the input values.";
+        return;
+      }
+      closeModal();
+      await fetchEmployees();
+    } catch {
+      $("error-msg").textContent = "Unable to save employee.";
     }
-
-    closeModal();
-    fetchEmployees();
   }
 
   async function deactivate(id) {
-    if (!confirm("Deactivate this employee?")) return;
-    await fetch(`${API}/api/employees/${id}`, { method: "DELETE" });
-    fetchEmployees();
+    if (role !== "admin" || !confirm("Deactivate this employee?")) return;
+    const res = await apiFetch("/api/employees/" + encodeURIComponent(id), {method: "DELETE"});
+    if (res.status === 401) return signOut("Please sign in again.");
+    if (!res.ok) return showMessage("Deactivation failed.");
+    await fetchEmployees();
   }
-
-  // Close modal on backdrop click
-  document.getElementById("modal").addEventListener("click", e => {
+  $("modal").addEventListener("click", e => {
     if (e.target === e.currentTarget) closeModal();
   });
-
-  fetchEmployees();
 </script>
 </body>
 </html>

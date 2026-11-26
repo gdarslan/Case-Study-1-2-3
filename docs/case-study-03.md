@@ -85,12 +85,26 @@ The [CS3 source snapshot](../case-study-03/) was recovered from the final local 
 - `monitoring/`: CloudWatch dashboard configuration.
 - `ci-reference/ci-cd.yml`: historical image pipeline, retained as an inactive reference.
 - `deploy-local.sh`: historical Minikube deployment helper with the hardcoded demo password removed.
-- `deploy.sh`: original EKS/RDS approach — not compatible with the active Terraform configuration as-is.
+- `ci-reference/deploy-aws-reference.sh` and `aws-ingress-reference.yaml`: original EKS/RDS approach — inactive, not compatible with the active Terraform configuration as-is.
 
 ## Local review
 
-For an isolated, disposable demo environment, review `deploy-local.sh` and the Kubernetes manifests first. It is intended for a machine with Docker, Minikube and kubectl configured (run from this case-study directory). Supply a strong `DB_PASSWORD` privately before invoking it; never use real employee data. It edits image references in the manifests and is not guaranteed idempotent. Do not run the AWS deployment script without reworking the inactive infrastructure design and validating the configuration.
+For an isolated, disposable demo environment, review `deploy-local.sh` and the Kubernetes manifests first. It is intended for a machine with Docker, Minikube and kubectl configured (run from this case-study directory). Supply a strong `DB_PASSWORD`, plus distinct `HR_ADMIN_TOKEN` and `HR_VIEWER_TOKEN` values of at least 32 characters, privately before invoking it. The local script uses a dedicated Minikube profile and renders image substitutions without editing source manifests. After the script completes, use the printed localhost port-forward command, and sign in using the appropriate demo token. Never use real employee data. Do not run the archived AWS deployment script without reworking and validating the inactive infrastructure design.
 
 ## Reflection
 
 Combining infrastructure, containers, application development and lifecycle automation highlighted the importance of adapting to real environment constraints. When managed services could not be used within budget and account policy, I chose practical substitutes, documented their limitations, and kept the main workflow demonstrable. Troubleshooting IAM, ECR, networking and Kubernetes also reinforced the value of allocating time for integration and operational validation.
+
+## Post-semester hardening
+
+The HR API now distinguishes read-only and administrative demo tokens, requires authentication for employee data, and rejects viewer writes. Tokens remain in browser memory and are sent to the same-origin proxy, not URLs or persistent storage. Employee data is rendered with safe text nodes; input roles/statuses are constrained. The network policies explicitly allow backend and database-init traffic to the private PostgreSQL service and deny other inbound/outbound traffic by default. The local script no longer modifies checked-in YAML, uses a dedicated Minikube context and a policy-capable CNI, and exposes the portal only via a printed localhost port-forward command. These are educational safeguards, not enterprise identity federation.
+
+No live deployment was performed for the hardening revision. The historical 17 PASS / 2 N/A results above relate to the original semester version.
+
+## Original evidence
+
+![Historical HR portal with fictional employee records](images/cs3-hr-portal.jpg)
+
+![Historical Kubernetes pod replacement evidence](images/cs3-pod-recovery.jpg)
+
+Screenshots are cropped from the original test report.

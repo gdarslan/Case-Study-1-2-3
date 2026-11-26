@@ -1,9 +1,13 @@
 from contextlib import asynccontextmanager
-from typing import Optional
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+from typing import Optional, Literal
+import os
+import logging
+from fastapi import FastAPI, HTTPException, Depends, Header
+from pydantic import BaseModel, EmailStr, Field
 from database import get_connection, init_db
+from auth import authenticate
+
+log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -14,29 +18,35 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Innovatech HR API", version="1.0.0", lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def require_user(authorization: str | None = Header(default=None)) -> str:
+    role = authenticate(authorization, os.getenv("HR_ADMIN_TOKEN", ""), os.getenv("HR_VIEWER_TOKEN", ""))
+    if role is None:
+        raise HTTPException(status_code=401, detail="Authentication required",
+                            headers={"WWW-Authenticate": "Bearer"})
+    return role
+
+
+def require_admin(role: str = Depends(require_user)) -> str:
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    return role
 
 
 # ─── Schemas ────────────────────────────────────────────────────────────────
 
 class EmployeeCreate(BaseModel):
-    name: str
-    email: EmailStr
-    department: str
-    role: str
-    status: str = "active"
+    name: str = Field(min_length=1, max_length=100)
+    email: EmailStr = Field(max_length=150)
+    department: str = Field(min_length=1, max_length=100)
+    role: Literal["developer", "admin", "hr", "readonly"]
+    status: Literal["active", "inactive", "pending"] = "active"
 
 
 class EmployeeUpdate(BaseModel):
-    name: Optional[str] = None
-    department: Optional[str] = None
-    role: Optional[str] = None
-    status: Optional[str] = None
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    department: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    role: Optional[Literal["developer", "admin", "hr", "readonly"]] = None
+    status: Optional[Literal["active", "inactive", "pending"]] = None
 
 
 # ─── Routes ─────────────────────────────────────────────────────────────────
@@ -46,7 +56,12 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/api/employees")
+@app.get("/api/session")
+def session(role: str = Depends(require_user)):
+    return {"role": role}
+
+
+@app.get("/api/employees", dependencies=[Depends(require_user)])
 def list_employees():
     conn = get_connection()
     try:
@@ -57,7 +72,7 @@ def list_employees():
         conn.close()
 
 
-@app.get("/api/employees/{employee_id}")
+@app.get("/api/employees/{employee_id}", dependencies=[Depends(require_user)])
 def get_employee(employee_id: int):
     conn = get_connection()
     try:
@@ -71,7 +86,7 @@ def get_employee(employee_id: int):
         conn.close()
 
 
-@app.post("/api/employees", status_code=201)
+@app.post("/api/employees", status_code=201, dependencies=[Depends(require_admin)])
 def create_employee(payload: EmployeeCreate):
     conn = get_connection()
     try:
@@ -91,12 +106,13 @@ def create_employee(payload: EmployeeCreate):
         conn.rollback()
         if "unique" in str(e).lower():
             raise HTTPException(status_code=409, detail="Email already exists")
-        raise HTTPException(status_code=500, detail=str(e))
+        log.exception("Employee creation failed")
+        raise HTTPException(status_code=500, detail="Unable to create employee")
     finally:
         conn.close()
 
 
-@app.put("/api/employees/{employee_id}")
+@app.put("/api/employees/{employee_id}", dependencies=[Depends(require_admin)])
 def update_employee(employee_id: int, payload: EmployeeUpdate):
     fields = {k: v for k, v in payload.model_dump().items() if v is not None}
     if not fields:
@@ -121,7 +137,7 @@ def update_employee(employee_id: int, payload: EmployeeUpdate):
         conn.close()
 
 
-@app.delete("/api/employees/{employee_id}", status_code=204)
+@app.delete("/api/employees/{employee_id}", status_code=204, dependencies=[Depends(require_admin)])
 def deactivate_employee(employee_id: int):
     """Soft delete — marks the employee inactive rather than removing the record."""
     conn = get_connection()

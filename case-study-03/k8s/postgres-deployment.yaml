@@ -40,6 +40,11 @@ spec:
                 secretKeyRef:
                   name: hr-db-secret
                   key: DB_PASS
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 3
+            periodSeconds: 5
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
