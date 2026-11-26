@@ -1,0 +1,7 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: hr-frontend
+          image: innovatech/hr-frontend:latest
+          imagePullPolicy: Never

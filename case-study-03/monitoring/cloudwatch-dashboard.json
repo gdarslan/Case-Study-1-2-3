@@ -1,0 +1,129 @@
+{
+  "widgets": [
+    {
+      "type": "text",
+      "width": 24,
+      "height": 1,
+      "properties": {
+        "markdown": "# Innovatech — EKS & HR App Monitoring (REQ-NCA-P3-12)"
+      }
+    },
+    {
+      "type": "metric",
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "EKS Node CPU Utilization (%)",
+        "metrics": [
+          ["AWS/EC2", "CPUUtilization", "AutoScalingGroupName", "innovatech-node-group", { "stat": "Average", "period": 60 }]
+        ],
+        "view": "timeSeries",
+        "region": "eu-central-1",
+        "yAxis": { "left": { "min": 0, "max": 100 } }
+      }
+    },
+    {
+      "type": "metric",
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "EKS Node Memory Utilization (%)",
+        "metrics": [
+          ["ContainerInsights", "node_memory_utilization", "ClusterName", "innovatech-eks", { "stat": "Average", "period": 60 }]
+        ],
+        "view": "timeSeries",
+        "region": "eu-central-1"
+      }
+    },
+    {
+      "type": "metric",
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Running Pods (hr-app namespace)",
+        "metrics": [
+          ["ContainerInsights", "pod_number_of_running_containers", "ClusterName", "innovatech-eks", "Namespace", "hr-app", { "stat": "Sum", "period": 60 }]
+        ],
+        "view": "timeSeries",
+        "region": "eu-central-1"
+      }
+    },
+    {
+      "type": "metric",
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "RDS CPU Utilization (%)",
+        "metrics": [
+          ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", "innovatech-postgres", { "stat": "Average", "period": 60 }]
+        ],
+        "view": "timeSeries",
+        "region": "eu-central-1",
+        "yAxis": { "left": { "min": 0, "max": 100 } }
+      }
+    },
+    {
+      "type": "metric",
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "RDS Database Connections",
+        "metrics": [
+          ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", "innovatech-postgres", { "stat": "Average", "period": 60 }]
+        ],
+        "view": "timeSeries",
+        "region": "eu-central-1"
+      }
+    },
+    {
+      "type": "metric",
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "RDS Free Storage (GB)",
+        "metrics": [
+          ["AWS/RDS", "FreeStorageSpace", "DBInstanceIdentifier", "innovatech-postgres", { "stat": "Average", "period": 300, "id": "m1" }]
+        ],
+        "view": "timeSeries",
+        "region": "eu-central-1"
+      }
+    },
+    {
+      "type": "metric",
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "ALB Request Count",
+        "metrics": [
+          ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "app/innovatech-alb/xxxxxxxxxxxx", { "stat": "Sum", "period": 60 }]
+        ],
+        "view": "timeSeries",
+        "region": "eu-central-1"
+      }
+    },
+    {
+      "type": "metric",
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "ALB 5XX Errors",
+        "metrics": [
+          ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", "app/innovatech-alb/xxxxxxxxxxxx", { "stat": "Sum", "period": 60, "color": "#d62728" }]
+        ],
+        "view": "timeSeries",
+        "region": "eu-central-1"
+      }
+    },
+    {
+      "type": "log",
+      "width": 24,
+      "height": 6,
+      "properties": {
+        "title": "HR App Logs (last 20 entries)",
+        "query": "SOURCE '/innovatech/eks/hr-app' | fields @timestamp, @message | sort @timestamp desc | limit 20",
+        "region": "eu-central-1",
+        "view": "table"
+      }
+    }
+  ]
+}

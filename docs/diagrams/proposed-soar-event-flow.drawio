@@ -1,0 +1,76 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.17 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36" version="24.7.17">
+  <diagram id="ww1_Ty71M-VlflR0h6Zv" name="Page-1">
+    <mxGraphModel dx="767" dy="449" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="SOAR Event Flow — Innovatech Solutions" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="160" y="30" width="760" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="src_label" value="Alert sources" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=bottom;fontSize=11;fontColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="40" y="260" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ec2" value="EC2 app instances" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="40" y="100" width="130" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="onprem" value="On-prem servers" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="40" y="158" width="130" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="ecs" value="ECS / Lambda" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="40" y="216" width="130" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="eb" value="&lt;b&gt;EventBridge&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px;&#39;&gt;Custom event bus&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a20025;strokeColor=#6F0000;fontSize=11;fontColor=#ffffff;" parent="1" vertex="1">
+          <mxGeometry x="220" y="148" width="140" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="sqs" value="&lt;b&gt;SQS Queue&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px;&#39;&gt;soar-alerts-queue&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="410" y="148" width="140" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="soar" value="&lt;b&gt;SOAR Processor&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px;&#39;&gt;ECS Fargate&lt;br&gt;Rule engine (Python)&lt;br&gt;Desired: 2 tasks × 2 AZ&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontSize=11;fontColor=#ffffff;" parent="1" vertex="1">
+          <mxGeometry x="600" y="132" width="160" height="88" as="geometry" />
+        </mxCell>
+        <mxCell id="dlq" value="DLQ (after 3 fails)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="620" y="260" width="120" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="ses" value="&lt;b&gt;Lambda: SES action&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px;&#39;&gt;Email alert (HIGH/CRITICAL)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a20025;strokeColor=#6F0000;fontSize=11;fontColor=#ffffff;" parent="1" vertex="1">
+          <mxGeometry x="820" y="100" width="180" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="&lt;b&gt;Lambda: S3 log action&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px;&#39;&gt;Write JSON to S3 (ALL events)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a20025;strokeColor=#6F0000;fontSize=11;fontColor=#ffffff;" parent="1" vertex="1">
+          <mxGeometry x="820" y="180" width="180" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="s3note" value="SES → recipient email&#xa;S3 key: soar-event-logs/{dt}" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;fontColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="820" y="244" width="200" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="mon_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fa6800;strokeColor=#C73500;fontSize=11;fontColor=#000000;" parent="1" vertex="1">
+          <mxGeometry x="40" y="340" width="960" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="mon_title" value="SOAR monitoring (REQ-P2-08 / REQ-P2-09)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="40" y="346" width="960" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="mon_text" value="Lambda CloudWatch metrics → CloudWatch Exporter → Prometheus → Grafana SOAR dashboard&#xa;Metrics: invocation count, error rate, duration, SQS queue depth, DLQ depth" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="40" y="372" width="960" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;" parent="1" source="ec2" target="eb" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;" parent="1" source="onprem" target="eb" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;" parent="1" source="ecs" target="eb" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="Rule matching" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;" parent="1" source="eb" target="sqs" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="Buffer + retry" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;" parent="1" source="sqs" target="soar" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="Poll + evaluate" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;" parent="1" source="soar" target="dlq" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="ALL events" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;" parent="1" source="soar" target="s3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
