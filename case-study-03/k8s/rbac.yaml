@@ -1,0 +1,58 @@
+# Kubernetes RBAC for the hr-app namespace (REQ-NCA-P3-10, P3-11)
+
+# Developer role — can view and manage app resources, cannot touch secrets
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hr-developer
+  namespace: hr-app
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/logs", "services", "configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+# Read-only role — view logs and pod status only
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hr-readonly
+  namespace: hr-app
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/logs", "services"]
+    verbs: ["get", "list", "watch"]
+---
+# Bind the developer role to the innovatech-developers IAM group (via aws-auth)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hr-developer-binding
+  namespace: hr-app
+subjects:
+  - kind: Group
+    name: innovatech-developers
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: hr-developer
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hr-readonly-binding
+  namespace: hr-app
+subjects:
+  - kind: Group
+    name: innovatech-readonly
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: hr-readonly
+  apiGroup: rbac.authorization.k8s.io

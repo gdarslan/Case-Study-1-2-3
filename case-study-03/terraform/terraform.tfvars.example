@@ -1,0 +1,12 @@
+aws_region   = "eu-central-1"
+environment  = "production"
+project_name = "innovatech"
+
+# Database (used by K8s postgres pod locally)
+db_name     = "innovatech"
+db_username = "innovatech_admin"
+
+# db_password must be set as an environment variable before running terraform:
+# Set TF_VAR_db_password securely in your environment.
+
+budget_alert_email = "admin@example.com"

@@ -1,0 +1,69 @@
+# One-shot Job that runs db_init.sql against RDS on first deploy.
+# Safe to re-run — uses CREATE TABLE IF NOT EXISTS and ON CONFLICT DO NOTHING.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init-sql
+  namespace: hr-app
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS employees (
+        id          SERIAL PRIMARY KEY,
+        name        VARCHAR(100)  NOT NULL,
+        email       VARCHAR(150)  NOT NULL UNIQUE,
+        department  VARCHAR(100)  NOT NULL,
+        role        VARCHAR(100)  NOT NULL,
+        status      VARCHAR(20)   NOT NULL DEFAULT 'active'
+                                  CHECK (status IN ('active', 'inactive', 'pending')),
+        sso_user_id VARCHAR(200),
+        created_at  TIMESTAMP     NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMP     NOT NULL DEFAULT NOW()
+    );
+
+    CREATE OR REPLACE FUNCTION update_updated_at()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS set_updated_at ON employees;
+    CREATE TRIGGER set_updated_at
+        BEFORE UPDATE ON employees
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+    INSERT INTO employees (name, email, department, role, status) VALUES
+        ('Alice Johnson', 'alice.johnson@example.com', 'Engineering', 'developer', 'active'),
+        ('Bob Martinez',  'bob.martinez@example.com',  'HR',          'hr',        'active'),
+        ('Carol Smith',   'carol.smith@example.com',   'IT',          'admin',     'active')
+    ON CONFLICT (email) DO NOTHING;
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+  namespace: hr-app
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: db-init
+          image: postgres:15-alpine
+          command: ["sh", "-c"]
+          args:
+            - |
+              psql "postgresql://$DB_USER:$DB_PASS@$DB_HOST:$DB_PORT/$DB_NAME" \
+                   -f /sql/init.sql && echo "DB init complete."
+          envFrom:
+            - secretRef:
+                name: hr-db-secret
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+      volumes:
+        - name: sql
+          configMap:
+            name: db-init-sql

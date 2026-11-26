@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hr-frontend
+  namespace: hr-app
+  labels:
+    app: hr-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hr-frontend
+  template:
+    metadata:
+      labels:
+        app: hr-frontend
+    spec:
+      containers:
+        - name: hr-frontend
+          image: <AWS_ACCOUNT_ID>.dkr.ecr.eu-central-1.amazonaws.com/innovatech/hr-frontend:latest
+          ports:
+            - containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hr-frontend
+  namespace: hr-app
+spec:
+  selector:
+    app: hr-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP

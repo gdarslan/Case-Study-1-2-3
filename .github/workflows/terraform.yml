@@ -8,6 +8,8 @@ on:
       - '**.tf'
       - 'soar/ses_handler.py'
       - 'soar/s3_handler.py'
+      # CS3 is a historical snapshot, not part of the CS2 AWS deployment.
+      - '!case-study-03/**'
 
 jobs:
   terraform-soar:

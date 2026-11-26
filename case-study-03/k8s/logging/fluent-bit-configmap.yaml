@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: logging
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         5
+        Log_Level     info
+        Daemon        off
+        Parsers_File  parsers.conf
+
+    # Collect all container logs from the node
+    [INPUT]
+        Name              tail
+        Tag               kube.*
+        Path              /var/log/containers/*.log
+        Parser            docker
+        DB                /var/log/flb_kube.db
+        Mem_Buf_Limit     50MB
+        Skip_Long_Lines   On
+        Refresh_Interval  10
+
+    # Enrich logs with Kubernetes pod/namespace/label metadata
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+        Merge_Log           On
+        Keep_Log            Off
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude On
+
+    # Ship hr-app namespace logs to its own CloudWatch log group
+    [OUTPUT]
+        Name                cloudwatch_logs
+        Match               kube.*hr-app*
+        region              eu-central-1
+        log_group_name      /innovatech/eks/hr-app
+        log_stream_prefix   pod-
+        auto_create_group   true
+
+    # Ship all other cluster logs (system, kube-system) to a separate group
+    [OUTPUT]
+        Name                cloudwatch_logs
+        Match               kube.*
+        region              eu-central-1
+        log_group_name      /innovatech/eks/cluster
+        log_stream_prefix   pod-
+        auto_create_group   true
+
+  parsers.conf: |
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On

@@ -1,0 +1,58 @@
+# Micro-segmentation: limits lateral movement inside the cluster (REQ-NCA-P3-07)
+
+# Frontend can only receive traffic from the ALB ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-frontend
+  namespace: hr-app
+spec:
+  podSelector:
+    matchLabels:
+      app: hr-frontend
+  ingress:
+    - {}   # ALB targets pods directly (IP mode) — allow all ingress at pod level
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: hr-backend
+      ports:
+        - port: 8000
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# Backend can only receive traffic from the frontend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-backend
+  namespace: hr-app
+spec:
+  podSelector:
+    matchLabels:
+      app: hr-backend
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: hr-frontend
+      ports:
+        - port: 8000
+  egress:
+    - {}   # backend needs outbound for RDS (outside cluster) and DNS
+---
+# Default deny all traffic not explicitly allowed in this namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: hr-app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
