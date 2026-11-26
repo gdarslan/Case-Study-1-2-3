@@ -1,3 +1,0 @@
-{"alert_type": "SSH_BRUTE_FORCE", "severity": "HIGH", "source_ip": "192.168.1.50", "hostname": "on-prem-server-01", "timestamp": "2026-04-09T08:00:00Z", "message": "20 failed SSH login attempts in 60 seconds"}
-{"alert_type": "PORT_SCAN", "severity": "MEDIUM", "source_ip": "10.0.5.22", "hostname": "on-prem-server-01", "timestamp": "2026-04-09T08:05:00Z", "message": "Nmap scan detected on ports 22,80,443,3306"}
-{"alert_type": "MALWARE_DETECTED", "severity": "CRITICAL", "source_ip": "10.0.5.77", "hostname": "on-prem-server-02", "timestamp": "2026-04-09T08:10:00Z", "message": "Ransomware signature detected in /tmp/payload.sh"}

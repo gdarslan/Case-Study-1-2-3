@@ -56,19 +56,25 @@ The test grouping above condenses the detailed test cases rather than counting r
 ## Limitations and next improvements
 
 - Resolve ECR image pull and ECS task startup before claiming live SOAR operation.
-- Add HTTPS, restrict administrative access to approved sources, and authenticate the alert endpoint.
+- At semester completion, HTTPS, administrative ingress restriction and alert authentication remained improvements; later hardening is described below.
 - Enable Multi-AZ RDS and increase ECS task redundancy if required for production.
 - Improve SOAR observability with custom metrics and verified dashboard data.
 - Avoid applying historical IaC without a cost and security review.
 
-## Source layout on the existing main branch
+## Source layout
 
 - `cs2-main.tf`, `cs2-variables.tf`, `providers.tf`: SOAR infrastructure.
 - `Infra/`: independent application and monitoring infrastructure.
 - `soar/`: Python/Flask alert API, rule engine, SES handler, S3 handler and Dockerfile.
-- `.github/workflows/`: historical Terraform and image deployment workflows.
+- `ci-reference/`: original Terraform and image deployment workflows, kept inactive.
 - `diagrams/`: original proposed architecture and event flow (under the documentation directory).
 
 ## Configuration notes
 
-This source is based on the existing May 2026 GitHub `main` snapshot; the SOAR code matches the supplied final CS2 ZIP. Terraform's archive data sources generate the Lambda ZIP files from the Python handlers, although the historical branch also contains generated archives. Review the account-specific remote-state and key-pair configuration in `Infra/`, provide SES sender/recipient variables and database credentials privately, verify ECR image availability and review a plan before provisioning. Historical workflows may perform live deployments; do not run them without reviewing their triggers and commands.
+The [CS2 source snapshot](../case-study-02/) is based on the May 2026 GitHub implementation and supplied archives, with publication-time hardening. Terraform's archive data sources generate the Lambda ZIP files from the Python handlers, so generated archives are excluded from the reorganized working tree. Review the account-specific remote-state and key-pair configuration in `Infra/`, provide SES sender/recipient variables and database credentials privately, verify ECR image availability and review a plan before provisioning. Historical workflows may perform live deployments; do not run them without reviewing their triggers and commands.
+
+## Post-semester hardening
+
+The diagram and test results above describe the original semester implementation. In the subsequent portfolio revision, the SOAR application now checks a bearer token supplied through an existing AWS Secrets Manager secret, validates JSON types and size, uses a separate health endpoint, and reports asynchronous Lambda requests as accepted rather than as completed. The ALB configuration requires an ACM certificate for HTTPS and a restricted alert-source CIDR. Administrative SSH and monitoring ingress require a trusted CIDR. Alert archive keys now include unique identifiers; SES HTML content is escaped.
+
+The new source requires account-specific configuration: review `terraform.tfvars.example`, provide the certificate ARN and a secret ARN (containing a strong plaintext token), and configure `Infra/backend.hcl.example` and the application variables securely. The original live tests were not rerun following these changes.

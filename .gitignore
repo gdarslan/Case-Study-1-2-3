@@ -1,4 +1,23 @@
-﻿.terraform/
+# Terraform / secrets
+**/.terraform/
 *.tfstate
 *.tfstate.*
-crash.log
+*.tfplan
+*.tfvars
+*.tfvars.json
+backend.hcl
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+!*.tfvars.example
+# Build output / logs
+__pycache__/
+*.py[cod]
+.venv/
+*.zip
+!docs/**/*.zip
+*.log
+.DS_Store
+Thumbs.db

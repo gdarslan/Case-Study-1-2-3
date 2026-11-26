@@ -2,57 +2,57 @@
 
 **Görkem Deniz Arslan · Fontys University of Applied Sciences · 2026**
 
-An individual cloud engineering portfolio developed across three consecutive case studies. The project follows a fictional growing company, Innovatech Solutions, from foundational AWS networking and monitoring to security automation and an employee lifecycle platform.
+An individual cloud engineering portfolio following a fictional growing company, Innovatech Solutions, through three successive infrastructure and automation case studies.
 
-Each phase is documented separately, with its source and validation status identified. The repository is a record of architectural decisions, implementation, testing and lessons learned—not one simultaneously deployed production system.
-
-## Project progression
-
-| Phase | Focus | Main technologies | Validation |
-| --- | --- | --- | --- |
-| [01 — Cloud infrastructure](docs/case-study-01.md) | Secure three-tier workloads, hub-and-spoke networking, observability | AWS VPC, EC2, ALB, ASG, RDS, Route 53, Terraform, Prometheus, Grafana | Infrastructure and monitoring described in the phase report |
-| [02 — Security automation](docs/case-study-02.md) | Rule-based SOAR service and isolated infrastructure stacks | ECS Fargate, ECR, Python/Flask, Lambda, SES, S3, Terraform, GitHub Actions | 7 pass, 6 partial in the recorded test report |
-| [03 — Employee lifecycle](docs/case-study-03.md) | HR self-service, Kubernetes resilience, IAM automation, cloud governance | FastAPI, PostgreSQL, Docker, Minikube, Kubernetes, AWS IAM/ECR/CloudWatch/SSM/Budgets | 17 pass, 2 not applicable due to AWS sandbox restrictions |
-
-## Architecture evolution
+| Case study | Focus | Technologies |
+| :--- | :--- | :--- |
+| [01 — Cloud infrastructure](docs/case-study-01.md) | Segmented AWS networking, three-tier architecture, observability | Terraform, VPC Peering, EC2, ALB, RDS, Route 53, Prometheus, Grafana |
+| [02 — Security automation](docs/case-study-02.md) | Alert intake, severity-based automated response, independent infrastructure stacks | ECS Fargate, ECR, Flask, Lambda, SES, S3, GitHub Actions |
+| [03 — Employee lifecycle](docs/case-study-03.md) | Containerized HR portal, identity lifecycle automation, Kubernetes and governance | FastAPI, PostgreSQL, Minikube, Kubernetes, IAM, CloudWatch, SSM, AWS Budgets |
 
 ```mermaid
 flowchart LR
-    A["CS1<br/>AWS networking<br/>IaC + observability"]
-    B["CS2<br/>SOAR alert processing<br/>Isolated cloud stacks"]
-    C["CS3<br/>HR platform<br/>Kubernetes + cloud governance"]
-    A --> B --> C
+    A["CS1 · Infrastructure and monitoring"] --> B["CS2 · SOAR and security automation"]
+    B --> C["CS3 · HR platform and cloud governance"]
 ```
+
+## Project evidence
+
+**CS1 — Monitoring dashboard (original semester evidence)**
+
+![Grafana CPU and memory monitoring](docs/images/cs1-grafana.jpg)
+
+**CS3 — Employee management portal (original semester evidence)**
+
+![HR portal displaying fictional employee records](docs/images/cs3-hr-portal.jpg)
+
+The screenshots are cropped from original project reports to remove unrelated identifiers and browser/workstation details. They show the historical implementation, not the later hardening changes.
 
 ## Technical highlights
 
-- Segmented AWS networks, private database access, controlled ingress and internal DNS.
-- Terraform-based infrastructure and GitHub Actions references for repeatable deployments.
-- SOAR rule engine routes alert notifications and archives to serverless response functions.
-- Containerized HR REST API and web frontend with persistent PostgreSQL storage, Kubernetes RBAC, NetworkPolicies and autoscaling configuration.
-- Employee onboarding/offboarding scripts targeting AWS IAM Identity Center.
-- Cost monitoring, budget thresholds, patch baseline configuration and documented trade-offs.
+- AWS network segmentation, private database access, bastion administration, load balancing, and internal DNS.
+- Terraform infrastructure as code and CI/CD workflow design.
+- Serverless security response: route alerts to Lambda, archive them in S3, and send high-severity notifications through SES.
+- HR REST API, containerized frontend, persistent PostgreSQL, Kubernetes RBAC, resource probes, network isolation, and autoscaling configuration.
+- Employee onboarding/offboarding scripts targeting AWS IAM Identity Center, with sandbox restrictions documented.
+- Cost thresholds, observability and security baseline configuration.
 
-## Repository structure
+## Repository layout
 
 ```text
-Infra/                   Existing CS2 three-tier infrastructure
-soar/                    Existing CS2 SOAR processor
-cs2-main.tf              Existing CS2 SOAR Terraform
-case-study-03/           Final HR platform and AWS support infrastructure
-docs/case-study-01.md    AWS infrastructure and monitoring
-docs/case-study-02.md    SOAR and three-tier AWS infrastructure
-docs/case-study-03.md    HR portal, automation, Kubernetes and Terraform
-docs/diagrams/           Original design drawings
-docs/portfolio-notes.md  Source provenance and publication notes
+case-study-01/   AWS infrastructure
+case-study-02/   AWS infrastructure and SOAR application
+case-study-03/   HR application, Kubernetes, AWS support infrastructure
+docs/            Architecture, historical test results, design evidence
+tests/           Offline regression checks
 ```
 
-The case-study documents describe architecture, validation, limitations and source locations. The original design drawings are retained under `docs/diagrams/`; proposed designs are explicitly distinguished from deployed configurations.
+The phases are distinct educational snapshots, not one simultaneously deployed production system. Historical test outcomes and limitations remain in the phase documentation; post-semester portfolio hardening is recorded separately in [portfolio notes](docs/portfolio-notes.md).
 
-CS1 is represented by the earlier repository history. The original CS2 code remains at the repository root. CS3 is included as a separate [source snapshot](case-study-03/) from the final local archive, with account-specific configuration replaced by examples.
+Run the dependency-free regression checks locally with:
 
-## Project status
+```bash
+python -m unittest discover -s tests -v
+```
 
-This is a historical educational portfolio. The deployments were tested during the semester in a student AWS account; no claim is made that the services are still running. The original CS2 source remains in place. Its Terraform workflow excludes the separate CS3 folder, and the CS3 pipeline is retained as an inactive reference. Do not deploy the historical code without a security, account configuration and cost review.
-
-See [portfolio notes](docs/portfolio-notes.md) for provenance and important security considerations.
+No active CI workflow deploys AWS resources. The original deployment workflows are retained as inactive references. The source is intended for an isolated educational lab; review credentials, account permissions, network access and costs before attempting a deployment.

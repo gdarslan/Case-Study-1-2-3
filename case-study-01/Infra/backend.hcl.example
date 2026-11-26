@@ -1,0 +1,5 @@
+bucket         = "replace-with-your-state-bucket"
+key            = "case-study-01/infra.tfstate"
+region         = "eu-central-1"
+dynamodb_table = "replace-with-your-lock-table"
+encrypt        = true

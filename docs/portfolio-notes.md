@@ -1,25 +1,21 @@
-# Portfolio notes and source provenance
+# Portfolio provenance and publication notes
 
-| Phase | Source used to document the project |
+| Phase | Source |
 | --- | --- |
-| CS1 | Historical GitHub snapshot (March 2026) and the phase-one report. |
-| CS2 | GitHub `main` commit `9e54a86` (23 May 2026); compared against the supplied CS2 archives and architecture, network and test reports. |
-| CS3 | Final local archive `Last-One.zip`, Git commit `1cee59b` (23 June 2026), and the cost, validation and reflection reports. The tracked Terraform directory is present in the embedded Git history, but was not included in the ZIP's checked-out working files. |
+| CS1 | March 2026 historical GitHub snapshot and the phase-one report. |
+| CS2 | May 2026 repository implementation and supplied archives; network, architecture and test reports. |
+| CS3 | Final local archive and its tracked June 2026 Git commit; cost, test and reflection reports. The Terraform files were recovered from the embedded Git history. |
 
-The three phases are historical implementation snapshots. They are not intended to run as one simultaneous deployment. The separate CS3 source folder reflects the final archive, with the missing tracked Terraform files recovered from its embedded Git history.
+The phase folders preserve the progression of the semester. Reports summarize the historical evidence honestly, including incomplete and blocked tests. Original Word reports are not published; selected original screenshots have been cropped to omit unrelated identifiers and private browser/workstation details.
 
-## Publication adjustments
+## Portfolio revision
 
-- The original CS1/CS2 Git history and CS2 application/Terraform source remain intact.
-- The final CS3 source is in `case-study-03/`; local passwords, personal email and account-specific configuration are replaced with placeholders or inputs.
-- The historical CS3 CI workflow is in `ci-reference/`, not an active workflow directory.
-- The existing CS2 Terraform workflow excludes the CS3 folder, so publishing that snapshot does not trigger the CS2 cloud deployment.
-- Original Word reports and screenshots are summarized in public-facing Markdown, avoiding personal information and environment-specific console identifiers.
-- Terraform state, generated archives, caches, logs, private configuration and embedded Git history are not included in the new snapshot.
-- Test results are historical results from the semester documentation. No new live tests against AWS or Kubernetes were run during this preparation.
+- Restored CS1 as a separate source snapshot; moved CS2 out of the root directory and preserved CS3.
+- Removed empty command artefacts, redundant generated archives and alert logs from the current working tree; Git history was not rewritten.
+- Used input variables for credentials, private configuration, trusted ingress ranges and account-specific state settings.
+- Moved original cloud deployment pipelines and the CS3 AWS deployment script into inactive reference folders; only offline regression checks run in GitHub Actions.
+- Hardened SOAR bearer-token authentication, alert input validation, HTTPS listener configuration, least-scope Lambda invocation, safe email formatting and archive key uniqueness.
+- Added demo HR administrator/read-only authorization, safe DOM rendering, input validation, database network policies and an idempotent local deployment helper.
+- Added local regression checks for authentication and alert routing. These checks do not demonstrate a live AWS, Kubernetes or database deployment.
 
-## Before further source publication
-
-Review repository visibility and historical source for credentials before publishing or restructuring. If any credentials were previously committed, rotate them; removing credentials in a later commit does not remove them from existing Git history. Account-specific values, local demo credentials, Terraform state, cached provider binaries, generated archives, logs, and any private environment configuration should not be published.
-
-The original Terraform and CI/CD files may create paid cloud resources. Review workflows, plans, IAM permissions, secrets and costs before deploying them. The original diagrams depict proposed architectures in parts; the case-study documents distinguish those proposals from the implementation.
+Keep the historical results separate from this later maintenance revision. The repository is an educational portfolio; cloud deployments need review of IAM policies, costs, credentials, TLS, monitoring and account restrictions. Do not use real employee data. Existing history may contain historical credentials; rotate any that were ever used and review history deliberately before further public distribution.

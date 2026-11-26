@@ -10,4 +10,6 @@ See [architecture, validation, cost management and limitations](../docs/case-stu
 - `terraform/` — AWS support infrastructure and inactive EKS/RDS reference definitions
 - `ci-reference/` — historical GitHub Actions pipeline, not an active workflow
 
-Configuration examples use placeholders instead of environment-specific values. Provide your own secret values privately. Review the deployment scripts before running them; `deploy.sh` describes the original managed EKS/RDS approach and is not compatible with the current active Terraform configuration as-is. The historical local demo uses Minikube and in-cluster PostgreSQL. Never use real employee data or deploy the demo publicly without hardening.
+Configuration examples use placeholders instead of environment-specific values. Provide your own secret values privately. Review the deployment scripts before running them; `ci-reference/deploy-aws-reference.sh` describes the original managed EKS/RDS approach and is not compatible with the current active Terraform configuration as-is. The historical local demo uses Minikube and in-cluster PostgreSQL. Never use real employee data or deploy the demo publicly without hardening.
+
+The local demo now requires distinct administrator and viewer tokens in addition to the database password. See the linked technical notes for the local workflow and the distinction between historical evidence and subsequent security hardening.

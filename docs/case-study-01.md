@@ -38,8 +38,14 @@ The first phase established my Terraform, cloud networking and CI/CD foundation.
 
 ## Source location
 
-The CS1 source is represented by the March 2026 repository history. It contains `Infra/` (Terraform networking, compute, RDS, Route 53, variables and backend setup), the original GitHub Actions workflow, and provider lock files.
+The [CS1 source snapshot](../case-study-01/) was recovered from the March 2026 history. It contains `Infra/` (Terraform networking, compute, RDS, Route 53, variables and backend setup), the original GitHub Actions workflow as an inactive reference, and a provider lock file.
 
 ## Configuration notes
 
-The historical configuration was written for a specific student AWS account. Review and replace account-specific settings, use a sensitive Terraform input for the database password, and restrict administrative ingress before any redeployment. The current documentation update does not modify the existing source or state.
+The historical configuration was written for a specific student AWS account. Review and replace account-specific settings, use a sensitive Terraform input for the database password, and restrict administrative ingress before any redeployment. The publication snapshot replaces the historic literal database password with a sensitive input, uses example state/key-pair settings and requires a restricted administrative CIDR. No cloud resources or Terraform state were changed.
+
+## Historical monitoring evidence
+
+![Grafana monitoring screenshot from CS1 report](images/cs1-grafana.jpg)
+
+Cropped original screenshot; identifiers removed.

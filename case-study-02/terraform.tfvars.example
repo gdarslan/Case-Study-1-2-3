@@ -1,0 +1,7 @@
+aws_region = "eu-central-1"
+ses_sender_email = "sender@example.com"
+ses_recipient_email = "recipient@example.com"
+alert_source_cidr = "192.0.2.1/32" # replace with trusted producer IP range
+# Set the existing ACM certificate and Secrets Manager ARN in your private configuration.
+soar_tls_certificate_arn = "replace-with-acm-certificate-arn"
+soar_api_token_secret_arn = "replace-with-secrets-manager-secret-arn"

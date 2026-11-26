@@ -23,6 +23,8 @@ spec:
           envFrom:
             - secretRef:
                 name: hr-db-secret
+            - secretRef:
+                name: hr-api-secret
           livenessProbe:
             httpGet:
               path: /health
